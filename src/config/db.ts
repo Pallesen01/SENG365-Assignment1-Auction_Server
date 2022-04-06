@@ -11,6 +11,7 @@ const state = {
 const connect = async (): Promise<void> => {
 
     state.pool = await mysql.createPool( {
+        connectionLimit: 100,
         multipleStatements: true,
         host: process.env.SENG365_MYSQL_HOST,
         user: process.env.SENG365_MYSQL_USER,
