@@ -35,7 +35,7 @@ function initString(x: string) {
 
 const validate = ajv.compile(AuctionRequestSchema);
 
-const list = async (req: Request, res: Response) : Promise<void> => {
+const search = async (req: Request, res: Response) : Promise<void> => {
     Logger.http(`GET all auctions`);
     try {
         const valid = validate(req.query);
@@ -51,8 +51,6 @@ const list = async (req: Request, res: Response) : Promise<void> => {
             const q = initString(req.query.q as string);
             const sortBy = initString(req.query.sortBy as string);
 
-            Logger.info(q);
-
             const auctions = await auction.getAll(q,categoryIds, sellerId, sortBy, count, startIndex, bidderId);
             const result = {"count":auctions.length, "auctions":auctions};
             res.status( 200 ).send( result );
@@ -67,8 +65,24 @@ const list = async (req: Request, res: Response) : Promise<void> => {
     }
 };
 
+const read = async (req: Request, res: Response) : Promise<void> => {
+    Logger.http(`GET single auction id: ${req.params.id}`);
+    const id = parseInt(req.params.id, 10);
+    try {
+        const result = await auction.getOne(id);
+        if( result.length === 0 ){
+            res.status( 404 ).send('Auction not found');
+        } else {
+            res.status( 200 ).send( result[0] );
+        }
+    } catch( err ) {
+        res.status( 500 ).send( `ERROR reading Auction ${id}: ${ err }`
+        );
+    }
+};
+
 const create = async (req:any, res:any) : Promise<any> => {
     return null;
 };
 
-export { list, create }
+export { search, read, create }
