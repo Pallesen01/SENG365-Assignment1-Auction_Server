@@ -2,6 +2,7 @@ import {Request, Response} from "express";
 import Logger from '../../config/logger';
 import * as auction from '../models/auction.model';
 import Ajv, {stringify} from "ajv"
+import logger from "../../config/logger";
 
 const ajv = new Ajv();
 
@@ -33,12 +34,12 @@ function initString(x: string) {
     return null;
 }
 
-const validate = ajv.compile(AuctionRequestSchema);
+const validateAuctionRequest = ajv.compile(AuctionRequestSchema);
 
 const search = async (req: Request, res: Response) : Promise<void> => {
     Logger.http(`GET all auctions`);
     try {
-        const valid = validate(req.query);
+        const valid = validateAuctionRequest(req.query);
         Logger.info(req.params);
 
         if (valid) {
@@ -67,17 +68,26 @@ const search = async (req: Request, res: Response) : Promise<void> => {
 
 const read = async (req: Request, res: Response) : Promise<void> => {
     Logger.http(`GET single auction id: ${req.params.id}`);
-    const id = parseInt(req.params.id, 10);
-    try {
-        const result = await auction.getOne(id);
-        if( result.length === 0 ){
-            res.status( 404 ).send('Auction not found');
-        } else {
-            res.status( 200 ).send( result[0] );
+
+    let valid = false;
+    if (!isNaN(Number(req.params.id))) {
+        valid = true;
+    }
+    if (valid) {
+        const id = parseInt(req.params.id, 10);
+        try {
+            const result = await auction.getOne(id);
+            if (result.length === 0) {
+                res.status(404).send('Auction not found');
+            } else {
+                res.status(200).send(result[0]);
+            }
+        } catch (err) {
+            res.status(500).send(`ERROR reading Auction ${id}: ${err}`
+            );
         }
-    } catch( err ) {
-        res.status( 500 ).send( `ERROR reading Auction ${id}: ${ err }`
-        );
+    } else {
+        res.status(500).send(`ERROR validating auction request`);
     }
 };
 
