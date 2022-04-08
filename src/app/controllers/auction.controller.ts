@@ -20,19 +20,17 @@ const AuctionRequestSchema = {
 }
 
 function initNum(x: string) {
-    let returnVal = null;
-    if (!x === undefined) {
-        returnVal = parseInt(x as string,10);
+    if (x !== undefined) {
+        return parseInt(x as string,10);
     }
-    return returnVal;
+    return null;
 }
 
 function initString(x: string) {
-    let returnVal = null;
-    if (!x === undefined) {
-        returnVal = x;
+    if (x !== undefined) {
+        return x;
     }
-    return returnVal;
+    return null;
 }
 
 const validate = ajv.compile(AuctionRequestSchema);
@@ -41,7 +39,7 @@ const list = async (req: Request, res: Response) : Promise<void> => {
     Logger.http(`GET all auctions`);
     try {
         const valid = validate(req.query);
-        Logger.info(req.query);
+        Logger.info(req.params);
 
         if (valid) {
             const categoryIds = initNum(req.query.categoryIds as string);
@@ -52,6 +50,8 @@ const list = async (req: Request, res: Response) : Promise<void> => {
 
             const q = initString(req.query.q as string);
             const sortBy = initString(req.query.sortBy as string);
+
+            Logger.info(q);
 
             const auctions = await auction.getAll(q,categoryIds, sellerId, sortBy, count, startIndex, bidderId);
             const result = {"count":auctions.length, "auctions":auctions};
