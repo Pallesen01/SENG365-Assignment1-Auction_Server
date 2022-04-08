@@ -8,3 +8,13 @@ type Auction = {
     seller_id: number,
     category_id: number
 }
+
+type AuctionRequest = {
+    q: string,
+    categoryIds: number,
+    sellerId: number,
+    sortBy: string,
+    count: number,
+    startIndex: number,
+    bidderId: number
+}
