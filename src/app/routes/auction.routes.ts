@@ -9,6 +9,9 @@ module.exports = (app: Express) => {
         .get( auction.search )
         .post ( auction.create );
 
+    app.route( rootUrl + '/auctions/categories' )
+        .get( auction.getCategories );
+
     app.route( rootUrl + '/auctions/:id' )
         .get( auction.read )
         .post ( auction.create );

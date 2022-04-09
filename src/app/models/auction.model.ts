@@ -108,4 +108,13 @@ const getOne = async (id: number) : Promise<Auction[]> => {
     return rows;
 };
 
-export { getAll, getOne }
+const getCategories = async () : Promise<Category[]> => {
+    Logger.info(`Getting all categories from the database`);
+    const conn = await getPool().getConnection();
+    const query = 'SELECT * from category';
+    const [ rows ] = await conn.query(query);
+    conn.release();
+    return rows;
+}
+
+export { getAll, getOne, getCategories }

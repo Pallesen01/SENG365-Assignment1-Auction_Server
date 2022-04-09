@@ -1,8 +1,7 @@
 import {Request, Response} from "express";
 import Logger from '../../config/logger';
 import * as auction from '../models/auction.model';
-import Ajv, {stringify} from "ajv"
-import logger from "../../config/logger";
+import Ajv from "ajv"
 
 const ajv = new Ajv();
 
@@ -20,6 +19,8 @@ const AuctionRequestSchema = {
     additionalProperties: false
 }
 
+const validateAuctionRequest = ajv.compile(AuctionRequestSchema);
+
 function initNum(x: string) {
     if (x !== undefined) {
         return parseInt(x as string,10);
@@ -33,8 +34,6 @@ function initString(x: string) {
     }
     return null;
 }
-
-const validateAuctionRequest = ajv.compile(AuctionRequestSchema);
 
 const search = async (req: Request, res: Response) : Promise<void> => {
     Logger.http(`GET all auctions`);
@@ -87,12 +86,25 @@ const read = async (req: Request, res: Response) : Promise<void> => {
             );
         }
     } else {
-        res.status(500).send(`ERROR validating auction request`);
+        res.status(400).send(`ERROR validating auction request`);
     }
 };
+
+const getCategories = async (req:any, res:any) : Promise<any> => {
+    Logger.http(`GET all categories`);
+    try {
+        const result = await auction.getCategories();
+        res.status( 200 ).send( result );
+    } catch ( err ) {
+        res.status( 500 ).send("Error getting all categories")
+    }
+
+
+    return null;
+}
 
 const create = async (req:any, res:any) : Promise<any> => {
     return null;
 };
 
-export { search, read, create }
+export { search, read, create, getCategories }

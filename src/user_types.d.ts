@@ -9,12 +9,16 @@ type Auction = {
     category_id: number
 }
 
-type AuctionRequest = {
-    q: string,
-    categoryIds: number,
-    sellerId: number,
-    sortBy: string,
-    count: number,
-    startIndex: number,
-    bidderId: number
+type Category = {
+    id: number,
+    name: string
+}
+
+type User = {
+    id: number,
+    firstName: string,
+    lastName: string,
+    email: string,
+    password: string,
+    currentPassword: string
 }
