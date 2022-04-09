@@ -15,10 +15,11 @@ type Category = {
 }
 
 type User = {
-    id: number,
+    userId: number,
     firstName: string,
     lastName: string,
     email: string,
     password: string,
-    currentPassword: string
+    currentPassword: string,
+    authToken: string
 }

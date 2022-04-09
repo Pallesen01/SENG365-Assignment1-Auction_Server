@@ -1,23 +1,48 @@
 import {NextFunction, Request, Response} from "express";
 import Logger from "../../config/logger";
+import * as user from '../models/user.model';
+import logger from "../../config/logger";
+import {info} from "winston";
+import {isNull} from "util";
 
-/*exports.loginRequired =  async (req: Request, res: Response, next: NextFunction) : Promise<void> => {
+export interface RequestWithUserId extends Request {
+    authenticatedUserId: number;
+}
+
+export const loginRequired =  async (req: RequestWithUserId, res: Response, next: NextFunction) => {
     const token = req.header('X-Authorization');
 
     try{
-        const result = await findUserIdByToken(token);
-        if (result === null) {
-            res.statusMessage = 'Unauthorized';
+        const result = await user.findUserIdByToken(token);
+        if (!result) {
             res.status(401)
-                .send();
+                .send("Unauthorized");
         } else {
-            req.authenticatedUserId = result.user_id.toString();
+            req.authenticatedUserId = result;
             next();
         }
     } catch (err) {
         if (!err.hasBeenLogged) Logger.error(err);
-        res.statusMessage = 'Internal Server Error';
         res.status(500)
-            .send();
+            .send('Internal Server Error');
     }
-}*/
+}
+
+export const loginOptional =  async (req: RequestWithUserId, res: Response, next: NextFunction) => {
+    const token = req.header('X-Authorization');
+
+    try{
+        const result = await user.findUserIdByToken(token);
+        if (result) {
+            req.authenticatedUserId = result;
+            next();
+        } else {
+            next();
+        }
+
+    } catch (err) {
+        if (!err.hasBeenLogged) Logger.error(err);
+        res.status(500)
+            .send('Internal Server Error');
+    }
+}
