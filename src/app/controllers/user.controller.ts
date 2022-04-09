@@ -193,20 +193,28 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
 export const login = async (req: Request, res: Response, next: NextFunction) : Promise<void> => {
     Logger.info("User logging in");
     const logInData: User = req.body;
-    const userData = (await user.viewDetails(logInData.email))[0];
-    if (userData) {
-        const isPasswordMatching = await bcrypt.compare(logInData.password, userData.password);
-        if (isPasswordMatching) {
-            const genToken = randtoken.generate(32);
-            await user.login(userData.userId, genToken);
-            const returnData : { userId: number; token: string } = {userId: userData.userId, token: genToken}
-            res.status(200).send(returnData);
+    try {
+        const userData = (await user.viewDetails(logInData.email))[0];
+
+        if (userData) {
+            const isPasswordMatching = await bcrypt.compare(logInData.password, userData.password);
+            if (isPasswordMatching) {
+                const genToken = randtoken.generate(32);
+                await user.login(userData.userId, genToken);
+                const returnData : { userId: number; token: string } = {userId: userData.userId, token: genToken}
+                res.status(200).send(returnData);
+            } else {
+                res.status(400).send("Invalid password");
+                next();
+            }
         } else {
-            res.status(400).send("Invalid password");
+            res.status(400).send("User does not exist");
             next();
         }
-    } else {
-        res.status(400).send("User does not exist");
+    } catch (e) {
+        Logger.error(e);
+        res.status(500).send("Internal Server Error");
         next();
+
     }
 }

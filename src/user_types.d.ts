@@ -1,12 +1,13 @@
 type Auction = {
-    id: number,
+    auctionId: number,
     title: string,
     description: string,
-    end_date: Date,
-    image_filename: string,
+    endDate: Date,
+    imageFilename: string,
     reserve: number,
-    seller_id: number,
-    category_id: number
+    sellerId: number,
+    categoryId: number,
+    numBids: number
 }
 
 type Category = {
@@ -22,4 +23,12 @@ type User = {
     password: string,
     currentPassword: string,
     authToken: string
+}
+
+type Bid = {
+    bidderId: number,
+    amount: number,
+    firstName: string,
+    lastName: string,
+    timestamp: string
 }
