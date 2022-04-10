@@ -23,6 +23,7 @@ type User = {
     password: string,
     currentPassword: string,
     authToken: string
+    imageFilename: string
 }
 
 type Bid = {

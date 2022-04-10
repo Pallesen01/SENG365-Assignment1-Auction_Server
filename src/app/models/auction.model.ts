@@ -187,8 +187,8 @@ const placeBid = async (auctionId: number, amount: number, bidderId: number) : P
 
 }
 
-const getImagePath = async (auctionId: number) : Promise<string> => {
-    Logger.info(`Getting image path for auction ${auctionId} from database`);
+const getImageFilename = async (auctionId: number) : Promise<string> => {
+    Logger.info(`Getting image filename for auction ${auctionId} from database`);
     const conn = await getPool().getConnection();
     const query = `SELECT \`image_filename\` FROM \`auction\` WHERE \`id\` = ${auctionId}; `;
     const [ rows ] = await conn.query(query);
@@ -196,4 +196,12 @@ const getImagePath = async (auctionId: number) : Promise<string> => {
     return rows[0].image_filename;
 }
 
-export { getAll, getOne, getCategories, deleteAuc, getCategory, create, update, getBids, placeBid, getImagePath }
+const setImageFilename = async (auctionId: number, filename: string) : Promise<void> => {
+    Logger.info(`Setting image filename for auction ${auctionId}  to ${filename} in database`);
+    const conn = await getPool().getConnection();
+    const query = `UPDATE \`auction\` SET \`image_filename\`='${filename}' WHERE \`id\` = ${auctionId}`;
+    await conn.query(query);
+    conn.release();
+}
+
+export { getAll, getOne, getCategories, deleteAuc, getCategory, create, update, getBids, placeBid, getImageFilename, setImageFilename }

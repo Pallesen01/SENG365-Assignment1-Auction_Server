@@ -5,7 +5,7 @@ import Ajv from "ajv"
 import {RequestWithUserId} from "../middleware/authenticate.middleware";
 import logger from "../../config/logger";
 import * as fs from "mz/fs"
-import * as path from "path";
+import * as user from "../models/user.model";
 
 const ajv = new Ajv();
 
@@ -233,6 +233,7 @@ const update = async (req:RequestWithUserId, res:Response, next: NextFunction) :
 };
 
 const deleteAuc = async (req:RequestWithUserId, res:Response, next: NextFunction) : Promise<void> => {
+    const imageDir = "storage/images/"
     Logger.info(`DELETE auction with id ${req.params.id}`);
     let valid = false;
     if (!isNaN(Number(req.params.id))) {
@@ -242,13 +243,18 @@ const deleteAuc = async (req:RequestWithUserId, res:Response, next: NextFunction
         const auctionData: Auction = (await auction.getOne(parseInt(req.params.id, 10)))[0];
         // Check that logged in user is the seller for this auction
         if (auctionData.sellerId !== req.authenticatedUserId || auctionData.numBids > 0) {
-            logger.error(`Cannot delete auction ${auctionData.auctionId}`);
+            logger.info(`Cannot delete auction ${auctionData.auctionId}`);
             res.status(403).send("Forbidden");
             next();
             return null;
         }
 
         try {
+            const prevFilename = await auction.getImageFilename(parseInt(req.params.id, 10));
+            if (!prevFilename === null) {
+                const filepath = imageDir.concat(prevFilename);
+                await fs.unlink(filepath);
+            }
             await auction.deleteAuc(auctionData.auctionId);
             res.status(200).send("Auction deleted successfully");
         } catch (e) {
@@ -348,18 +354,23 @@ const getImage = async (req:RequestWithUserId, res:Response) : Promise<void> => 
 
     if (valid) {
         try{
-            const filename = await auction.getImagePath(parseInt(req.params.id, 10));
+            const filename = await auction.getImageFilename(parseInt(req.params.id, 10));
             if (filename === null) {
                 res.status( 404 ).send("No image for this auction");
             } else {
                 const filePath = imageDir.concat(filename);
-                let fileType = path.extname(filePath).replace(".","");
-                if (fileType === "jpg") {fileType = "jpeg";}
-                const contentType = "image/".concat(fileType)
-                const imageData = fs.readFile(filePath);
-                Logger.info(filePath);
-                Logger.info(fileType);
-                res.status( 200 ).header('Content-Type', contentType).send(imageData);
+                if (filePath.endsWith('.jpg') || filePath.endsWith('jpeg')) {
+                    res.setHeader('content-type', "image/jpeg");
+                } else if ((filePath.endsWith('.png'))) {
+                    res.setHeader('content-type', "image/png");
+                } else if ((filePath.endsWith('.gif'))) {
+                    res.setHeader('content-type', "image/gif");
+                } else {
+                    res.status( 500 ).send("Internal Server Error");
+                    return null;
+                }
+                const imageData = await fs.readFile(filePath);
+                res.status( 200 ).send(imageData);
             }
 
         } catch (e) {
@@ -372,22 +383,51 @@ const getImage = async (req:RequestWithUserId, res:Response) : Promise<void> => 
 }
 
 const uploadImage = async (req:RequestWithUserId, res:Response) : Promise<void> => {
+    const fileType = req.header("Content-Type");
+    const imageDir = "storage/images/"
     let valid = true;
 
     // Check that id is a number
-    if (isNaN(Number(req.params.id))) {
+    if (isNaN(Number(req.params.id)) || (fileType !== "image/jpeg" && fileType !== "image/png" && fileType !== "image/gif" )  ) {
         valid = false;
     }
 
+    const auctionData: Auction = (await auction.getOne(parseInt(req.params.id, 10)))[0];
+
+    if (!auctionData) {
+        res.status(404).send("Auction doesn't exist");
+        return null;
+    }
+
+    // Check that logged in user is the seller for this auction
+    if (auctionData.sellerId !== req.authenticatedUserId) {
+        res.status(403).send("Forbidden");
+        return null;
+    }
+
+    if (valid) {
+        try{
+            const filename = `auction_${req.params.id}.${fileType.split("/")[1]}`;
+            const filepath = imageDir.concat(filename);
+
+            const prevFilename = await auction.getImageFilename(parseInt(req.params.id, 10));
+            req.pipe(fs.createWriteStream(filepath));
+            await auction.setImageFilename(parseInt(req.params.id, 10), filename)
+            if (prevFilename === null) {
+                res.status( 201 ).send("Add auction image");
+            } else {
+                res.status( 200 ).send("Updated auction image");
+            }
 
 
-    const fileType = req.header("Content-Type");
-    // const data = await fs.readFile("storage/images/auction_1.png");
-    // const data = await fs.readFile(req.body.toDataURL());
-    Logger.info(req.body.toString());
-    // await fs.writeFile("storage/images/endmepls.png", req.body, {encoding: "binary"});
-    res.status( 201 ).send( "Did a thing" );
-    return null;
+        } catch (err) {
+            Logger.error(err);
+            res.status( 500 ).send("Internal Server Error");
+        }
+
+    } else {
+        res.status( 400 ).send("Bad Request");
+    }
 }
 
 export { search, read, create, getCategories, update, deleteAuc, getBids, placeBid, getImage, uploadImage}

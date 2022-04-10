@@ -14,6 +14,11 @@ module.exports = (app: Express) => {
     app.route(rootUrl + '/users/logout')
         .post( authenticate.loginRequired, user.logout );
 
+    app.route( rootUrl + '/users/:id/image' )
+        .get ( user.getImage )
+        .put( authenticate.loginRequired, user.uploadImage)
+        .delete( authenticate.loginRequired, user.deleteImage );
+
     app.route(rootUrl + '/users/:id')
         .get(authenticate.loginOptional, user.get )
         .patch( authenticate.loginRequired, user.modify );

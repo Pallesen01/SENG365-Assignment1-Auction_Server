@@ -108,7 +108,6 @@ const viewDetails = async (userEmail: string) : Promise<User[]> => {
 const viewAllDetails = async (userId: number) : Promise<User[]> => {
     Logger.info(`Getting all details for user with id: ${userId}`);
     const selectSQL = `SELECT \`id\` AS userId, \`email\`, \`first_name\` AS firstName , \`last_name\` AS lastName , \`image_filename\` AS imageFilename , \`password\`, \`auth_token\` AS authToken FROM \`user\` WHERE \`id\` = ${userId}`;
-    Logger.info(selectSQL);
 
     try {
         const user = (await getPool().query(selectSQL))[0];
@@ -124,4 +123,29 @@ const viewAllDetails = async (userId: number) : Promise<User[]> => {
     }
 }
 
-export { viewDetails, getUser, create, login, findUserIdByToken, logout, viewAllDetails, updateDetails }
+const getImageFilename = async (userId: number) : Promise<string> => {
+    Logger.info(`Getting image filename for user ${userId} from database`);
+    const conn = await getPool().getConnection();
+    const query = `SELECT \`image_filename\` FROM \`user\` WHERE \`id\` = ${userId}; `;
+    const [ rows ] = await conn.query(query);
+    conn.release();
+    return rows[0].image_filename;
+}
+
+const setImageFilename = async (userId: number, filename: string) : Promise<void> => {
+    Logger.info(`Setting image filename for user ${userId}  to ${filename} in database`);
+    const conn = await getPool().getConnection();
+    const query = `UPDATE \`user\` SET \`image_filename\`='${filename}' WHERE \`id\` = ${userId}`;
+    await conn.query(query);
+    conn.release();
+}
+
+const removeImage = async (userId: number) : Promise<void> => {
+    Logger.info(`Removing image filename for user ${userId} in database`);
+    const conn = await getPool().getConnection();
+    const query = `UPDATE \`user\` SET \`image_filename\`=NULL WHERE \`id\` = ${userId}`;
+    await conn.query(query);
+    conn.release();
+}
+
+export { viewDetails, getUser, create, login, findUserIdByToken, logout, viewAllDetails, updateDetails, getImageFilename, setImageFilename, removeImage }

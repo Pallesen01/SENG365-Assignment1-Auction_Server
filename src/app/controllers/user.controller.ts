@@ -5,7 +5,8 @@ import * as bcrypt from "bcrypt";
 import Ajv from "ajv"
 import * as randtoken from "rand-token"
 import {RequestWithUserId} from "../middleware/authenticate.middleware";
-import logger from "../../config/logger";
+import * as fs from "mz/fs";
+import {getUser} from "../models/user.model";
 
 const ajv = new Ajv();
 
@@ -216,5 +217,145 @@ export const login = async (req: Request, res: Response, next: NextFunction) : P
         res.status(500).send("Internal Server Error");
         next();
 
+    }
+}
+
+export const getImage = async (req:RequestWithUserId, res:Response) : Promise<void> => {
+    Logger.info(`Getting image for user ${req.authenticatedUserId}`);
+    const imageDir = "storage/images/"
+    let valid = true;
+
+    // Check that id is a number
+    if (isNaN(Number(req.params.id))) {
+        valid = false;
+    }
+
+    if( valid && (await user.getUser(parseInt(req.params.id, 10))).length === 0) {
+        res.status( 404 ).send(`user not found`)
+        return null;
+    }
+
+    if (valid) {
+        try{
+            const filename = await user.getImageFilename(parseInt(req.params.id, 10));
+            if (filename === null) {
+                res.status( 404 ).send("No image for this user");
+            } else {
+                const filePath = imageDir.concat(filename);
+                if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) {
+                    res.setHeader('content-type', "image/jpeg");
+                } else if ((filePath.endsWith('.png'))) {
+                    res.setHeader('content-type', "image/png");
+                } else if ((filePath.endsWith('.gif'))) {
+                    res.setHeader('content-type', "image/gif");
+                } else {
+                    res.status( 500 ).send("Internal Server Error");
+                    return null;
+                }
+                const imageData = await fs.readFile(filePath);
+                res.status( 200 ).send(imageData);
+            }
+
+        } catch (e) {
+            Logger.error(e);
+            res.status( 500 ).send("Internal Server Error");
+        }
+
+    }
+
+}
+
+export const uploadImage = async (req:RequestWithUserId, res:Response) : Promise<void> => {
+    Logger.info(`Uploading image for user ${req.authenticatedUserId}`);
+    const fileType = req.header("Content-Type");
+    const imageDir = "storage/images/"
+    let valid = true;
+
+    // Check that id is a number
+    if (isNaN(Number(req.params.id)) || (fileType !== "image/jpeg" && fileType !== "image/png" && fileType !== "image/gif" )  ) {
+        valid = false;
+    }
+
+    const userData: User = (await user.viewAllDetails(parseInt(req.params.id, 10)))[0];
+
+    if (!userData) {
+        res.status(404).send("User doesn't exist");
+        return null;
+    }
+
+    // Check that logged in user is the user being edited
+    if (userData.userId !== req.authenticatedUserId) {
+        Logger.info(`${req.authenticatedUserId}  ${userData.userId}`);
+        res.status(403).send("Forbidden");
+        return null;
+    }
+
+    if (valid) {
+        try{
+            const filename = `user_${req.params.id}.${fileType.split("/")[1]}`;
+            const filepath = imageDir.concat(filename);
+
+            const prevFilename = await user.getImageFilename(parseInt(req.params.id, 10));
+            req.pipe(fs.createWriteStream(filepath));
+            await user.setImageFilename(parseInt(req.params.id, 10), filename)
+            if (prevFilename === null) {
+                res.status( 201 ).send("Added user image");
+            } else {
+                res.status( 200 ).send("Updated user image");
+            }
+
+
+        } catch (err) {
+            Logger.error(err);
+            res.status( 500 ).send("Internal Server Error");
+        }
+
+    } else {
+        res.status( 400 ).send("Bad Request");
+    }
+}
+
+export const deleteImage = async (req:RequestWithUserId, res:Response) : Promise<void> => {
+    Logger.info(`Deleting image for user ${req.authenticatedUserId}`);
+    const imageDir = "storage/images/"
+    let valid = true;
+
+    // Check that id is a number
+    if (isNaN(Number(req.params.id))) {
+        valid = false;
+    }
+
+    const userData: User = (await user.viewAllDetails(parseInt(req.params.id, 10)))[0];
+
+    if (userData.imageFilename === null) {
+        res.status(404).send("User has no image");
+        return null;
+    }
+
+    // Check that logged in user is the user being edited
+    if (userData.userId !== req.authenticatedUserId) {
+        res.status(403).send("Forbidden");
+        return null;
+    }
+
+    if (valid) {
+        try {
+            const prevFilename = await user.getImageFilename(parseInt(req.params.id, 10));
+            if (!(prevFilename === null)) {
+                const filepath = imageDir.concat(prevFilename);
+                await fs.unlink(filepath);
+                await user.removeImage(req.authenticatedUserId);
+            } else {
+                Logger.info("image already doesn't exist");
+            }
+            res.status( 200 ).send("Image deleted");
+        } catch (e) {
+            Logger.error(e);
+            res.status( 500 ).send("Internal Server Error");
+        }
+
+
+    } else {
+        res.status( 400 ).send("Bad Request");
     }
 }
