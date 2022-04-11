@@ -13,7 +13,7 @@ const AuctionRequestSchema = {
     type: "object",
     properties: {
         q: {type: "string"},
-        categoryIds: {type: "integer"},
+        categoryIds: {type: "array"},
         sellerId: {type: "integer"},
         sortBy: {type: "string"},
         count: {type: "integer"},
@@ -66,13 +66,24 @@ function initString(x: string) {
     return null;
 }
 
+function initArray(x: string[]) {
+    if (x !== undefined) {
+        const newArray = new Array();
+        for (const item of x) {
+            newArray.push(parseInt(item, 10))
+        }
+        return newArray
+    }
+    return null;
+}
+
 const search = async (req: Request, res: Response) : Promise<void> => {
     Logger.info(`GET all auctions`);
     try {
         const valid = validateAuctionRequest(req.query);
 
         if (valid) {
-            const categoryIds = initNum(req.query.categoryIds as string);
+            const categoryIds = initArray(req.query.categoryIds as string[]);
             const sellerId = initNum(req.query.sellerId as string);
             const count = initNum(req.query.count as string);
             const startIndex = initNum(req.query.startIndex as string);

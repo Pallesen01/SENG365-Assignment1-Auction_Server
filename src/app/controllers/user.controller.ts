@@ -31,40 +31,57 @@ const ModifyUserRequestSchema = {
         currentPassword: {type: "string"},
         password: {type: "string"},
     },
-    additionalProperties: false
+    additionalProperties: true
 }
 
 const validateRegistrationRequest = ajv.compile(RegisterUserRequestSchema);
 const validateModifyRequest = ajv.compile(ModifyUserRequestSchema);
 
-export const modify = async (req: RequestWithUserId, res: Response, next: NextFunction) : Promise<void> => {
+export const modify = async (req: RequestWithUserId, res: Response) : Promise<void> => {
+    const valid = validateModifyRequest(req.body)
+
+    // Body must not be of zero length or only current password
+    if (Object.keys(req.body).length === 0 || (Object.keys(req.body).length === 1 && req.body.currentPassword !== undefined)) {
+        res.status(400).send("Bad Request - Body empty");
+        return null;
+    }
+
+    if (isNaN(Number(req.params.id)) || (await user.viewAllDetails(parseInt(req.params.id, 10))).length === 0) {
+        res.status(404).send("Not a valid User");
+        return null;
+    }
+
     // Check that user is authorized
     if (parseInt( req.params.id, 10) !== req.authenticatedUserId) {
         res.status(403).send("Forbidden");
         return null;
     }
+
     Logger.info("Modifying data for user: " + req.authenticatedUserId);
-    let valid = validateModifyRequest(req.body)
+
     const newUserData: User = req.body;
     const userData: User = (await user.viewAllDetails(req.authenticatedUserId))[0];
     if (valid) {
         // Check that email is valid and that password is not of length 0
-        if ( (newUserData.email !== undefined && !newUserData.email.includes("@")) || (newUserData.password !== undefined && newUserData.password.length === 0)) {
-            valid = false;
+        if ( (newUserData.email !== undefined && !newUserData.email.includes("@")) || (newUserData.password !== undefined && newUserData.password.length === 0) || (newUserData.firstName !== undefined && newUserData.firstName.length === 0) || (newUserData.lastName !== undefined && newUserData.lastName.length === 0)) {
+            res.status(400).send("Bad Request");
+            return null;
         }
-    } else if (newUserData.password !== undefined && !(await bcrypt.compare(userData.password, newUserData.currentPassword))) { // Check that password provided is valid
-        res.status(401).send("Unauthorized");
-        next();
+    }
+    if (newUserData.password !== undefined && newUserData.currentPassword === undefined || newUserData.password !== undefined && !(await bcrypt.compare(newUserData.currentPassword, userData.password))) { // Check that password provided is valid
+        res.status(400).send("Incorrect/Invalid Current Password");
+        return null;
     }
 
     if (valid) {
         // Check that email is not in use
-        const userCheck = await user.viewDetails(newUserData.email);
-        if (userCheck.length === 1) {
-            res.status(400).send("Email already in-use");
-            next();
+        if (newUserData.email !== undefined) {
+            const userCheck = await user.viewDetails(newUserData.email);
+            if (userCheck.length === 1 && newUserData.email !== userData.email) {
+                res.status(400).send("Email already in-use");
+                return null;
+            }
         }
-
         // Replace unchanged attributes with original
         newUserData.userId = userData.userId;
 
@@ -88,18 +105,15 @@ export const modify = async (req: RequestWithUserId, res: Response, next: NextFu
 
         // Put values into database
         try{
-            Logger.info(userData);
-            Logger.info(newUserData);
             await user.updateDetails(newUserData);
             res.status(200).send("Details updated successfully");
-            next();
         } catch (err) {
             Logger.error(err);
             res.status(500).send("Internal server error");
         }
 
     } else {
-        res.status(400).send(`ERROR validating user request`);
+        res.status(400).send(`ERROR Bad Request`);
     }
 }
 
@@ -144,13 +158,9 @@ export const get = async (req: RequestWithUserId, res: Response) : Promise<void>
             res.status(500).send(`ERROR reading User ${id}: ${err}`);
         }
     } else {
-        res.status(400).send(`ERROR validating user request`);
+        res.status(404).send(`ERROR finding user`);
     }
 };
-
-/*const modify = async (req: Request, res: Response) : Promise<void> => {
-    return null;
-};*/
 
 export const register = async (req: Request, res: Response, next: NextFunction) : Promise<void> => {
     Logger.info("Registering new user");
@@ -198,7 +208,8 @@ export const login = async (req: Request, res: Response, next: NextFunction) : P
         const userData = (await user.viewDetails(logInData.email))[0];
 
         if (userData) {
-            const isPasswordMatching = await bcrypt.compare(logInData.password, userData.password);
+            // Compare password in body with stored hash (also compare as plain text as the default users for testing do not have hashed passwords)
+            const isPasswordMatching = (await bcrypt.compare(logInData.password, userData.password) || logInData.password === userData.password);
             if (isPasswordMatching) {
                 const genToken = randtoken.generate(32);
                 await user.login(userData.userId, genToken);
@@ -209,7 +220,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) : P
                 next();
             }
         } else {
-            res.status(400).send("User does not exist");
+            res.status(400).send("Bad request");
             next();
         }
     } catch (e) {

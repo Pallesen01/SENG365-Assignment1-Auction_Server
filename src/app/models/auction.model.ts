@@ -4,7 +4,7 @@ import {OkPacket, ResultSetHeader, RowDataPacket} from "mysql2";
 import {viewDetails} from "./user.model";
 import moment from 'moment';
 
-const getAll = async (q: string, categoryIds: number, sellerId: number, sortBy: string, count: number, startIndex: number, bidderId: number) : Promise<Auction[]> => {
+const getAll = async (q: string, categoryIds: number[], sellerId: number, sortBy: string, count: number, startIndex: number, bidderId: number) : Promise<Auction[]> => {
     Logger.info("Getting all auctions from the database");
     const conn = await getPool().getConnection();
     let whereClause = "WHERE 1";
@@ -16,7 +16,11 @@ const getAll = async (q: string, categoryIds: number, sellerId: number, sortBy: 
     }
 
     if (categoryIds != null) {
-        whereClause += " AND category_id = " + categoryIds;
+        whereClause += " AND category_id = " + categoryIds[0];
+        categoryIds.shift();
+        for (const item of categoryIds) {
+            whereClause += " OR category_id = " + item;
+        }
     }
 
     if (sellerId != null) {
@@ -83,6 +87,7 @@ const getAll = async (q: string, categoryIds: number, sellerId: number, sortBy: 
         orderByClause + '\n' +
         limitClause;
 
+    Logger.info(query);
     const [ rows ] = await conn.query( query );
     conn.release();
     return rows;
