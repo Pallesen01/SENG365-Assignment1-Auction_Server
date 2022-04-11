@@ -184,6 +184,8 @@ const create = async (req:RequestWithUserId, res:Response, next: NextFunction) :
                 res.status( 500).send("Internal Server Error");
             }
 
+        } else {
+            res.status(400).send("invalid")
         }
 
     } else {
@@ -264,46 +266,50 @@ const update = async (req:RequestWithUserId, res:Response, next: NextFunction) :
 };
 
 const deleteAuc = async (req:RequestWithUserId, res:Response, next: NextFunction) : Promise<void> => {
-    const imageDir = "storage/images/"
-    Logger.info(`DELETE auction with id ${req.params.id}`);
-    let valid = false;
-    if (!isNaN(Number(req.params.id))) {
-        valid = true;
-    }
-    if (valid) {
-        const auctionData: Auction = (await auction.getOne(parseInt(req.params.id, 10)))[0];
-
-        if (auctionData === null) {
-            logger.info(`Cannot delete auction ${auctionData.auctionId}`);
-            res.status(404).send("Auction does not exist");
-            next();
-            return null;
+    try {
+        const imageDir = "storage/images/"
+        Logger.info(`DELETE auction with id ${req.params.id}`);
+        let valid = false;
+        if (!isNaN(Number(req.params.id))) {
+            valid = true;
         }
+        if (valid) {
+            const auctionData: Auction = (await auction.getOne(parseInt(req.params.id, 10)))[0];
 
-        // Check that logged in user is the seller for this auction
-        if (auctionData.sellerId !== req.authenticatedUserId || auctionData.numBids > 0) {
-            logger.info(`Cannot delete auction ${auctionData.auctionId}`);
-            res.status(403).send("Forbidden");
-            next();
-            return null;
-        }
-
-        try {
-            const prevFilename = await auction.getImageFilename(parseInt(req.params.id, 10));
-            if (!prevFilename === null) {
-                const filepath = imageDir.concat(prevFilename);
-                await fs.unlink(filepath);
+            if (auctionData === null) {
+                logger.info(`Cannot delete auction ${auctionData.auctionId}`);
+                res.status(404).send("Auction does not exist");
+                next();
+                return null;
             }
-            await auction.deleteAuc(auctionData.auctionId);
-            res.status(200).send("Auction deleted successfully");
-        } catch (e) {
-            Logger.error(e);
-            res.status(500).send("Internal Server Error");
-            next();
-        }
 
-    } else {
-        res.status(400).send(`ERROR validating auction request`);
+            // Check that logged in user is the seller for this auction
+            if (auctionData.sellerId !== req.authenticatedUserId || auctionData.numBids > 0) {
+                logger.info(`Cannot delete auction ${auctionData.auctionId}`);
+                res.status(403).send("Forbidden");
+                next();
+                return null;
+            }
+
+            try {
+                const prevFilename = await auction.getImageFilename(parseInt(req.params.id, 10));
+                if (!prevFilename === null) {
+                    const filepath = imageDir.concat(prevFilename);
+                    await fs.unlink(filepath);
+                }
+                await auction.deleteAuc(auctionData.auctionId);
+                res.status(200).send("Auction deleted successfully");
+            } catch (e) {
+                Logger.error(e);
+                res.status(500).send("Internal Server Error");
+                next();
+            }
+
+        } else {
+            res.status(400).send(`ERROR validating auction request`);
+        }
+    } catch (err) {
+        res.status(500).send(err);
     }
 };
 

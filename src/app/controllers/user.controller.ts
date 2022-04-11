@@ -328,29 +328,29 @@ export const uploadImage = async (req:RequestWithUserId, res:Response) : Promise
 }
 
 export const deleteImage = async (req:RequestWithUserId, res:Response) : Promise<void> => {
-    Logger.info(`Deleting image for user ${req.authenticatedUserId}`);
-    const imageDir = "storage/images/"
-
-    // Check that id is a number
-    if (isNaN(Number(req.params.id))) {
-        res.status(404).send("Not a valid user");
-        return null;
-    }
-
-    const userData: User = (await user.viewAllDetails(parseInt(req.params.id, 10)))[0];
-
-    if (userData.imageFilename === null) {
-        res.status(400).send("User has no image");
-        return null;
-    }
-
-    // Check that logged in user is the user being edited
-    if (userData.userId !== req.authenticatedUserId) {
-        res.status(403).send("Forbidden");
-        return null;
-    }
-
     try {
+        Logger.info(`Deleting image for user ${req.authenticatedUserId}`);
+        const imageDir = "storage/images/"
+
+        // Check that id is a number
+        if (isNaN(Number(req.params.id))) {
+            res.status(404).send("Not a valid user");
+            return null;
+        }
+
+        const userData: User = (await user.viewAllDetails(parseInt(req.params.id, 10)))[0];
+
+        if (userData.imageFilename === null) {
+            res.status(400).send("User has no image");
+            return null;
+        }
+
+        // Check that logged in user is the user being edited
+        if (userData.userId !== req.authenticatedUserId) {
+            res.status(403).send("Forbidden");
+            return null;
+        }
+
         const prevFilename = await user.getImageFilename(parseInt(req.params.id, 10));
         if (!(prevFilename === null)) {
             const filepath = imageDir.concat(prevFilename);
