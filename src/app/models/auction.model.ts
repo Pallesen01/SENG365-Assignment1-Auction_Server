@@ -15,7 +15,7 @@ const getAll = async (q: string, categoryIds: number[], sellerId: number, sortBy
         whereClause += " AND title LIKE '%"+ q +"%' OR description LIKE '%"+ q + "%'"
     }
 
-    if (categoryIds != null) {
+    if (categoryIds != null && categoryIds[0] != null) {
         whereClause += " AND category_id = " + categoryIds[0];
         categoryIds.shift();
         for (const item of categoryIds) {
@@ -87,7 +87,7 @@ const getAll = async (q: string, categoryIds: number[], sellerId: number, sortBy
         orderByClause + '\n' +
         limitClause;
 
-    Logger.info(query);
+    // Logger.info(query);
     const [ rows ] = await conn.query( query );
     conn.release();
     return rows;

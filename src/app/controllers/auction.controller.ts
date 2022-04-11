@@ -13,7 +13,7 @@ const AuctionRequestSchema = {
     type: "object",
     properties: {
         q: {type: "string"},
-        categoryIds: {type: "array"},
+        categoryIds: {type: ["array", "number"]},
         sellerId: {type: "integer"},
         sortBy: {type: "string"},
         count: {type: "integer"},
@@ -68,7 +68,7 @@ function initString(x: string) {
 
 function initArray(x: string[]) {
     if (x !== undefined) {
-        const newArray = new Array();
+        const newArray: number[] = new Array();
         for (const item of x) {
             newArray.push(parseInt(item, 10))
         }
@@ -77,13 +77,23 @@ function initArray(x: string[]) {
     return null;
 }
 
+function isIterable (value: any) {
+    return Symbol.iterator in Object(value);
+}
+
 const search = async (req: Request, res: Response) : Promise<void> => {
     Logger.info(`GET all auctions`);
     try {
         const valid = validateAuctionRequest(req.query);
 
         if (valid) {
-            const categoryIds = initArray(req.query.categoryIds as string[]);
+            let categoryIds
+            if (isIterable(req.query.categoryIds)){
+                categoryIds = initArray(req.query.categoryIds as string[]);
+            } else {
+                categoryIds = [initNum(req.query.categoryIds as string)];
+            }
+
             const sellerId = initNum(req.query.sellerId as string);
             const count = initNum(req.query.count as string);
             const startIndex = initNum(req.query.startIndex as string);
@@ -91,6 +101,16 @@ const search = async (req: Request, res: Response) : Promise<void> => {
 
             const q = initString(req.query.q as string);
             const sortBy = initString(req.query.sortBy as string);
+
+            if (isIterable(categoryIds)) {
+                for (const item of categoryIds) {
+                    const catList = (await auction.getCategory(item))
+                    if (catList.length === 0 && item != null) {
+                        res.status( 400 ).send( "Bad Request - Invalid Category" );
+                        return null;
+                    }
+                }
+            }
 
             const auctions = await auction.getAll(q,categoryIds, sellerId, sortBy, count, startIndex, bidderId);
             const result = {"count":auctions.length, "auctions":auctions};
@@ -252,6 +272,14 @@ const deleteAuc = async (req:RequestWithUserId, res:Response, next: NextFunction
     }
     if (valid) {
         const auctionData: Auction = (await auction.getOne(parseInt(req.params.id, 10)))[0];
+
+        if (auctionData === null) {
+            logger.info(`Cannot delete auction ${auctionData.auctionId}`);
+            res.status(404).send("Auction does not exist");
+            next();
+            return null;
+        }
+
         // Check that logged in user is the seller for this auction
         if (auctionData.sellerId !== req.authenticatedUserId || auctionData.numBids > 0) {
             logger.info(`Cannot delete auction ${auctionData.auctionId}`);
@@ -323,8 +351,19 @@ const placeBid = async (req:RequestWithUserId, res:Response) : Promise<void> => 
     }
 
     if (valid) {
-        if (req.authenticatedUserId === (await auction.getOne(parseInt(req.params.id, 10)))[0].sellerId) {
+        const auctionData = (await auction.getOne(parseInt(req.params.id, 10)))[0]
+        if (auctionData === null) {
+            res.status( 404 ).send(`Auction doesn't exist`)
+            return null;
+        }
+
+        if (req.authenticatedUserId === auctionData.sellerId) {
             res.status( 403 ).send(`Cannot bid on your own auction`)
+            return null;
+        }
+
+        if (auctionData.endDate.getTime() < Date.now() ) {
+            res.status( 403 ).send(`Auction is closed`)
             return null;
         }
 
@@ -396,11 +435,17 @@ const getImage = async (req:RequestWithUserId, res:Response) : Promise<void> => 
 const uploadImage = async (req:RequestWithUserId, res:Response) : Promise<void> => {
     const fileType = req.header("Content-Type");
     const imageDir = "storage/images/"
-    let valid = true;
+
+    if (isNaN(Number(req.params.id))) {
+        res.status( 404 ).send("Invalid user");
+        return null;
+    }
+
 
     // Check that id is a number
-    if (isNaN(Number(req.params.id)) || (fileType !== "image/jpeg" && fileType !== "image/png" && fileType !== "image/gif" )  ) {
-        valid = false;
+    if ((fileType !== "image/jpeg" && fileType !== "image/png" && fileType !== "image/gif" )  ) {
+        res.status( 400 ).send("Bad Request");
+        return null;
     }
 
     const auctionData: Auction = (await auction.getOne(parseInt(req.params.id, 10)))[0];
@@ -416,29 +461,26 @@ const uploadImage = async (req:RequestWithUserId, res:Response) : Promise<void> 
         return null;
     }
 
-    if (valid) {
-        try{
-            const filename = `auction_${req.params.id}.${fileType.split("/")[1]}`;
-            const filepath = imageDir.concat(filename);
 
-            const prevFilename = await auction.getImageFilename(parseInt(req.params.id, 10));
-            req.pipe(fs.createWriteStream(filepath));
-            await auction.setImageFilename(parseInt(req.params.id, 10), filename)
-            if (prevFilename === null) {
-                res.status( 201 ).send("Add auction image");
-            } else {
-                res.status( 200 ).send("Updated auction image");
-            }
+    try{
+        const filename = `auction_${req.params.id}.${fileType.split("/")[1]}`;
+        const filepath = imageDir.concat(filename);
 
-
-        } catch (err) {
-            Logger.error(err);
-            res.status( 500 ).send("Internal Server Error");
+        const prevFilename = await auction.getImageFilename(parseInt(req.params.id, 10));
+        req.pipe(fs.createWriteStream(filepath));
+        await auction.setImageFilename(parseInt(req.params.id, 10), filename)
+        if (prevFilename === null) {
+            res.status( 201 ).send("Add auction image");
+        } else {
+            res.status( 200 ).send("Updated auction image");
         }
 
-    } else {
-        res.status( 400 ).send("Bad Request");
+
+    } catch (err) {
+        Logger.error(err);
+        res.status( 500 ).send("Internal Server Error");
     }
+
 }
 
 export { search, read, create, getCategories, update, deleteAuc, getBids, placeBid, getImage, uploadImage}

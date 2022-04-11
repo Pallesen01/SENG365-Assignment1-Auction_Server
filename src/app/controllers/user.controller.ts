@@ -280,11 +280,16 @@ export const uploadImage = async (req:RequestWithUserId, res:Response) : Promise
     Logger.info(`Uploading image for user ${req.authenticatedUserId}`);
     const fileType = req.header("Content-Type");
     const imageDir = "storage/images/"
-    let valid = true;
+
+    if (isNaN(Number(req.params.id))) {
+        res.status(404).send("Not a valid user");
+        return null;
+    }
 
     // Check that id is a number
-    if (isNaN(Number(req.params.id)) || (fileType !== "image/jpeg" && fileType !== "image/png" && fileType !== "image/gif" )  ) {
-        valid = false;
+    if ((fileType !== "image/jpeg" && fileType !== "image/png" && fileType !== "image/gif" )  ) {
+        res.status(400).send("Bad Request");
+        return null;
     }
 
     const userData: User = (await user.viewAllDetails(parseInt(req.params.id, 10)))[0];
@@ -301,45 +306,41 @@ export const uploadImage = async (req:RequestWithUserId, res:Response) : Promise
         return null;
     }
 
-    if (valid) {
-        try{
-            const filename = `user_${req.params.id}.${fileType.split("/")[1]}`;
-            const filepath = imageDir.concat(filename);
+    try{
+        const filename = `user_${req.params.id}.${fileType.split("/")[1]}`;
+        const filepath = imageDir.concat(filename);
 
-            const prevFilename = await user.getImageFilename(parseInt(req.params.id, 10));
-            req.pipe(fs.createWriteStream(filepath));
-            await user.setImageFilename(parseInt(req.params.id, 10), filename)
-            if (prevFilename === null) {
-                res.status( 201 ).send("Added user image");
-            } else {
-                res.status( 200 ).send("Updated user image");
-            }
-
-
-        } catch (err) {
-            Logger.error(err);
-            res.status( 500 ).send("Internal Server Error");
+        const prevFilename = await user.getImageFilename(parseInt(req.params.id, 10));
+        req.pipe(fs.createWriteStream(filepath));
+        await user.setImageFilename(parseInt(req.params.id, 10), filename)
+        if (prevFilename === null) {
+            res.status( 201 ).send("Added user image");
+        } else {
+            res.status( 200 ).send("Updated user image");
         }
 
-    } else {
-        res.status( 400 ).send("Bad Request");
+
+    } catch (err) {
+        Logger.error(err);
+        res.status( 500 ).send("Internal Server Error");
     }
+
 }
 
 export const deleteImage = async (req:RequestWithUserId, res:Response) : Promise<void> => {
     Logger.info(`Deleting image for user ${req.authenticatedUserId}`);
     const imageDir = "storage/images/"
-    let valid = true;
 
     // Check that id is a number
     if (isNaN(Number(req.params.id))) {
-        valid = false;
+        res.status(404).send("Not a valid user");
+        return null;
     }
 
     const userData: User = (await user.viewAllDetails(parseInt(req.params.id, 10)))[0];
 
     if (userData.imageFilename === null) {
-        res.status(404).send("User has no image");
+        res.status(400).send("User has no image");
         return null;
     }
 
@@ -349,24 +350,19 @@ export const deleteImage = async (req:RequestWithUserId, res:Response) : Promise
         return null;
     }
 
-    if (valid) {
-        try {
-            const prevFilename = await user.getImageFilename(parseInt(req.params.id, 10));
-            if (!(prevFilename === null)) {
-                const filepath = imageDir.concat(prevFilename);
-                await fs.unlink(filepath);
-                await user.removeImage(req.authenticatedUserId);
-            } else {
-                Logger.info("image already doesn't exist");
-            }
-            res.status( 200 ).send("Image deleted");
-        } catch (e) {
-            Logger.error(e);
-            res.status( 500 ).send("Internal Server Error");
+    try {
+        const prevFilename = await user.getImageFilename(parseInt(req.params.id, 10));
+        if (!(prevFilename === null)) {
+            const filepath = imageDir.concat(prevFilename);
+            await fs.unlink(filepath);
+            await user.removeImage(req.authenticatedUserId);
+        } else {
+            Logger.info("image already doesn't exist");
         }
-
-
-    } else {
-        res.status( 400 ).send("Bad Request");
+        res.status( 200 ).send("Image deleted");
+    } catch (e) {
+        Logger.error(e);
+        res.status( 500 ).send("Internal Server Error");
     }
+
 }
