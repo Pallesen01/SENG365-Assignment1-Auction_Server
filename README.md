@@ -1,13 +1,6 @@
 # SENG365 2022 Assignment 1 API server
 
-# Overview of how to work on the assignment
-1. You hackity hack...
-2. You test with Postman
-3. You commit your changes to your git repo on `eng-git.canterbury.ac.nz`.
-
-Remember that we will test your application by downloading it directly from the `master` branch  on eng-git.
-So ensure that you have committed everything to your repo before the deadline.
-It may also pay to check that you can download and run your application with the following steps
+# Downlading and running application
 
 1. Download repo
 2. run `npm install`
